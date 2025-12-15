@@ -26,7 +26,7 @@ async function main() {
   await client.send("Page.setDownloadBehavior", {
     behavior: "allow",
     downloadPath: path.join(process.cwd(), "hashes"),
-  })
+  });
 
   try {
     await page.goto("http://redump.org/discs/system/ps2/", { waitUntil: "domcontentloaded" });
@@ -34,74 +34,98 @@ async function main() {
     console.log("Navigation warning:", err.message);
   }
 
+  // Attach requestfailed handler once
   page.on("requestfailed", req => {
     if (req.failure()?.errorText.includes("ERR_BLOCKED_BY_CLIENT")) {
-      // ignore silently, this error prompts most of the time
+      // ignore silently
+      return;
     }
   });
 
-  const gamesTable = await page.$$("table.games tr"); // If games table changes names, etc
-  const games = [];                                   // Change it here
+  // Getting results, calculating page number, setting variables, etc
+  const resultsNumber = await page.evaluate(() => {
+    const el = [...document.querySelectorAll("b")]
+        .find(b => b.textContent.includes("Displaying results"));
+    if (!el) return null;
 
-  console.log("Searching for games. This may take a while depending on your hardware.")
-
-  // Store all games in table in array [ link , title ]
-  for (const game of gamesTable) {
-    const links = await game.$$eval("a", as =>
-        as
-            .filter(a => a.href.includes("/disc/")) // all <a> who's href includes /disc/ (games titles)
-            .map(a => ({
-                href: a.href,
-                text: a.textContent.trim()
-            }))
-    );
-
-    if (links.length === 0) continue; // Sometimes, rows don't have a link
-
-    const edition = await game.evaluate(tr => {
-      const tdS = tr.querySelectorAll("td");
-      return tdS[4] ? tdS[4].textContent.trim() : null; // This is hard coded as it just grabs the 5th row (which is edition). This could change
+    const match = el.textContent.match(/of\s+(\d+)/);
+    return match ? match[1] : null;
     });
 
-    if (edition !== "Original") continue; // Hard coded for now, only grabbing original PS2 games
+  const pages = Math.ceil(Number(resultsNumber) / 500); // 500 games a page, could change
 
-    for (const link of links) {
-      games.push({
-        ...link,
-        edition
-      });
+  await delay(1000); // Wait before requesting again & scraping
+
+  for (let i = 0; i < pages; i++) {
+
+    try {
+      await page.goto(`http://redump.org/discs/system/ps2/?page=${i + 1}`, { waitUntil: "domcontentloaded" });
+    } catch (err) {
+      console.log("Navigation warning:", err.message);
     }
-}
 
-  console.log(`Found ${games.length} games, downloading hashes...`)
+    const gamesTable = await page.$$("table.games tr");
+    const games = [];
 
-  for (let i = 0; i < games.length; i++) {
-    await page.goto(games[i].href, { waitUntil: "domcontentloaded"});
+    console.log(`Searching page ${i + 1} for games. This may take a while depending on your hardware.`);
 
-    await delay(200); // 200ms delay before clicking download
+    // Store all games in table in array [ link , title ]
+    for (const game of gamesTable) {
+      const links = await game.$$eval("a", as =>
+        as
+          .filter(a => a.href.includes("/disc/"))
+          .map(a => ({
+            href: a.href,
+            text: a.textContent.trim()
+          }))
+      );
 
-    // Click first instance of MD5 (download link)
-    await page.evaluate(() => {
+      if (links.length === 0) continue;
+
+      const edition = await game.evaluate(tr => {
+        const tdS = tr.querySelectorAll("td");
+        return tdS[4] ? tdS[4].textContent.trim() : null;
+      });
+
+      if (edition !== "Original") continue; // Hardcoded, we are only grabbing original PS2 games
+
+      for (const link of links) {
+        games.push({
+          ...link,
+          edition
+        });
+      }
+    }
+
+    console.log(`Found ${games.length} games, downloading hashes...`);
+
+    for (let i = 0; i < games.length; i++) {
+      await page.goto(games[i].href, { waitUntil: "domcontentloaded" });
+
+      await delay(200);
+
+      // Click first instance of MD5 (download link)
+      await page.evaluate(() => {
         const link = [...document.querySelectorAll("a")]
-        .find(a => a.textContent.includes("MD5"));
-    if (link) link.click()
-    });
-    
-    // Getting the game title
-    const gameTitle = await page.evaluate(() => {
+          .find(a => a.textContent.includes("MD5"));
+        if (link) link.click();
+      });
+
+      // Getting the game title
+      const gameTitle = await page.evaluate(() => {
         const h1 = document.querySelector("h1");
         return h1 ? h1.textContent.trim() : null;
-    });
-    console.log(`Downloaded hash for ${gameTitle}`)
+      });
+      console.log(`Downloaded hash for ${gameTitle}`);
 
-    await delay(750); // Delaying 0.75 seconds between downloads
-                      // This is a trade off between speed and
-                      // Not getting rate limited
+      await delay(750);
+    }
+
+    // Write games found to json
+    fs.writeFileSync("games.json", JSON.stringify(games, null, 2));
   }
 
-  // Write games found to json
-  fs.writeFileSync("games.json", JSON.stringify(games, null, 2));
-  console.log("foundGames.json");
+  await browser.close();
 }
 
 main();

@@ -1,2 +1,3 @@
-2025/12/15-15:18:27.137 1a90 Creating DB C:\Users\harry\redumphashscraper\chrome-profile\Default\Local Storage\leveldb since it was missing.
-2025/12/15-15:18:27.151 1a90 Reusing MANIFEST C:\Users\harry\redumphashscraper\chrome-profile\Default\Local Storage\leveldb/MANIFEST-000001
+2025/12/15-17:17:08.943 4ccc Reusing MANIFEST C:\Users\harry\redumphashscraper\chrome-profile\Default\Local Storage\leveldb/MANIFEST-000001
+2025/12/15-17:17:08.946 4ccc Recovering log #3
+2025/12/15-17:17:08.946 4ccc Reusing old log C:\Users\harry\redumphashscraper\chrome-profile\Default\Local Storage\leveldb/000003.log 

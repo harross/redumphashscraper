@@ -14,16 +14,17 @@ Therefore, this tool/script allows a user to scrape all PS2 games stored in Redu
 
 Written in node.js, and using Puppeteer, this tool is quite simple, 70-100 lines. It works in the following way:
 - We visit http://redump.org, on the PS2 section
+- We grab the total results value, divide this by the pagination value, and get the number of pages
+- For each page, we do the below steps
 - The program searches for and grabs all game titles, and the links behind them, storing these values in an array.
 - For each game title, we visit the games URL, again using puppeteer to scan for, and click the download link.
-- You are left with a /hashes/ directory of all .md5 hashes, for all PS2 games found on the page.
+- You are left with a /hashes/ directory of all .md5 hashes, for all PS2 games found on the page(s).
 - The program also outputs a simple .json file, showing all games found and their respective links
-- Generous delays are included to limit requests and avoid bans/rate limiting, these can be adjusted at your own risk.
+- Delays are included to limit requests and avoid bans/rate limiting, these can be adjusted at your own risk.
 
 ### Where it's going
 
 Soon, I will be adding:
-- The ability to use pagination and grab all titles at once (simple fix)
 - The ability to download hashes for all platforms, not just PS2
 
 This program exists to be a seed for my other project - a PS2 iso .md5 verifying tool. 
