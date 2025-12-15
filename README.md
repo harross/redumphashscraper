@@ -1,6 +1,5 @@
 # redumphashscraper
 ---
-
 ### What this tool is
 
 Redump hash scraper, and it's wonderfully imaginative name were invented to solve a problem I came across when trying to create another node project, and that's that .md5 hashes for PS2 games can be kind of hard to find. 
@@ -9,6 +8,12 @@ Not only that, but when/if you do find a data source, it could be out of date, n
 The best source we know of for .md5 game hashes is http://redump.org.
 
 Therefore, this tool/script allows a user to scrape all PS2 games stored in Redump.org, download their hashes, and save them in a directory along with their names. 
+
+### Usage
+
+`node ./index.js`
+
+Yes, it has not been compiled or renamed yet.
 
 ### How it works
 
