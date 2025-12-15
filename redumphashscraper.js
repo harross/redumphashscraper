@@ -56,8 +56,22 @@ async function main() {
             }))
     );
 
-    games.push(...links)
-  }
+    if (links.length === 0) continue; // Sometimes, rows don't have a link
+
+    const edition = await game.evaluate(tr => {
+      const tdS = tr.querySelectorAll("td");
+      return tdS[4] ? tdS[4].textContent.trim() : null; // This is hard coded as it just grabs the 5th row (which is edition). This could change
+    });
+
+    if (edition !== "Original") continue; // Hard coded for now, only grabbing original PS2 games
+
+    for (const link of links) {
+      games.push({
+        ...link,
+        edition
+      });
+    }
+}
 
   console.log(`Found ${games.length} games, downloading hashes...`)
 
