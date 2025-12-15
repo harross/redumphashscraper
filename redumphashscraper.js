@@ -1,8 +1,29 @@
 import puppeteer from "puppeteer";
-import fs from "fs";
+import fs from "fs/promises";
+import fsSync from "fs";
 import path from "path";
+import got from "got";
+import PQueue from "p-queue";
 
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms)); // Reusable delay
+
+// Reusable file exists check
+async function fileExists(dir, filename) {
+  try {
+    await fs.access(path.join(dir, filename))
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+// Sanitize game names
+function sanitize(name) {
+  return name
+    .replace(/[<>:"/\\|?*]/g, "_")
+    .replace(/\s+/g, "_")
+    .trim();
+}
 
 async function main() {
   const browser = await puppeteer.launch({
@@ -53,6 +74,7 @@ async function main() {
     });
 
   const pages = Math.ceil(Number(resultsNumber) / 500); // 500 games a page, could change
+  const allGames = [];
 
   await delay(1000); // Wait before requesting again & scraping
 
@@ -65,7 +87,6 @@ async function main() {
     }
 
     const gamesTable = await page.$$("table.games tr");
-    const games = [];
 
     console.log(`Searching page ${i + 1} for games. This may take a while depending on your hardware.`);
 
@@ -90,42 +111,82 @@ async function main() {
       if (edition !== "Original") continue; // Hardcoded, we are only grabbing original PS2 games
 
       for (const link of links) {
-        games.push({
+        allGames.push({
           ...link,
           edition
         });
       }
     }
 
-    console.log(`Found ${games.length} games, downloading hashes...`);
+    console.log(`Found ${allGames.length} games, downloading hashes in 3 seconds...`);
+    await delay(3000);
 
-    for (let i = 0; i < games.length; i++) {
-      await page.goto(games[i].href, { waitUntil: "domcontentloaded" });
+    const downloadUrls = [];
+    let rejected = 0;
 
-      await delay(200);
+    // Getting download links for all games
+    for (let i = 0; i < allGames.length; i++) {
+      const filename = `${sanitize(allGames[i].text)}.md5`;
+      const downloaded = await fileExists("./hashes", filename);
 
-      // Click first instance of MD5 (download link)
-      await page.evaluate(() => {
-        const link = [...document.querySelectorAll("a")]
-          .find(a => a.textContent.includes("MD5"));
-        if (link) link.click();
-      });
+      if (!downloaded) {
+        downloadUrls.push({
+          url: allGames[i].href + "md5",
+          name: allGames[i].text
+        });
+      } else if (downloaded) {
+        rejected++;
+      }
+    };
 
-      // Getting the game title
-      const gameTitle = await page.evaluate(() => {
-        const h1 = document.querySelector("h1");
-        return h1 ? h1.textContent.trim() : null;
-      });
-      console.log(`Downloaded hash for ${gameTitle}`);
-
-      await delay(750);
+    if (rejected > 0) {
+      console.log(`Already had ${rejected} hashes`)
     }
 
-    // Write games found to json
-    fs.writeFileSync("games.json", JSON.stringify(games, null, 2));
+    console.log("Page finished, downloading hashes...")
+    await delay(150);
+
+    for (const download of downloadUrls) {
+      await queue.add(() => downloadHash(download.url, download.name));
+    }
+
+    console.log("Downloads finished. Continuing...")
+    await delay(150);
   }
+
+  // Write games found to json
+    fsSync.writeFileSync("games.json", JSON.stringify(allGames, null, 2));
 
   await browser.close();
 }
 
+// --- Download Function --- //
+// Queue 
+const queue = new PQueue({
+  concurrency: 10,
+  interval: 1000,
+  intervalCap: 10
+});
+
+async function downloadHash(url, name) {
+  const finalName = sanitize(name);
+  const dir = path.join(process.cwd(), "hashes");
+  fsSync.mkdirSync(dir, { recursive: true });
+
+  const fileName = path.join(dir, `${finalName}.md5`)
+
+  console.log(`Downloading ${url} -> ${finalName}`);
+
+  const stream = got.stream(url);
+  await delay(250);
+  const fileWriter = fsSync.createWriteStream(fileName);
+
+  return new Promise((resolve, reject) => {
+    stream.pipe(fileWriter);
+
+    stream.on("error", reject);
+    fileWriter.on("finish", resolve);
+    fileWriter.on("error", reject);
+  });
+}
 main();
