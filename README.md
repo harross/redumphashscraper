@@ -13,7 +13,7 @@ Therefore, this tool/script allows a user to scrape all PS2 games stored in Redu
 
 `node ./index.js`
 
-Yes, it has not been compiled or renamed yet.
+Yes, it has not been compiledm packaged or renamed yet.
 
 ### How it works
 
